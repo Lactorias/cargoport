@@ -1,8 +1,9 @@
+use std::fs;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 
-pub fn get_handler(filename: &str, mut stream: &TcpStream) {
+pub fn get_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
     let ftp_root = std::env::var("FTP_ROOT")
         .unwrap_or_else(|_| String::from("/home/fishe/active/dirs/cargoport-test/"));
     let full_path = format!("{}/{}", ftp_root, filename);
@@ -24,16 +25,36 @@ pub fn get_handler(filename: &str, mut stream: &TcpStream) {
         if bytes_read == 0 {
             break;
         }
-        stream
-            .write_all(&buf[..bytes_read])
-            .expect("Failed to send file data.");
+        data.extend_from_slice(&buf[..bytes_read]);
     }
+
     println!("File '{}' sent successfully!", filename);
+}
+
+pub fn del_handler(filename: &str, mut stream: &TcpStream) {
+    let ftp_root = std::env::var("FTP_ROOT")
+        .unwrap_or_else(|_| String::from("/home/fishe/active/dirs/cargoport-test/"));
+    let full_path = format!("{}/{}", ftp_root, filename);
+
+    match fs::remove_file(full_path) {
+        Ok(()) => {
+            let success_msg = "Succesfully deleted file!";
+            stream
+                .write_all(success_msg.as_bytes())
+                .expect("Failed to alert of deletion.");
+        }
+        Err(_) => {
+            let error_msg = "Failed to delete file.";
+            stream
+                .write_all(error_msg.as_bytes())
+                .expect("Failed to alert of failed deletion.");
+        }
+    }
 }
 
 pub fn extract_filename(request: &str) -> Option<&str> {
     let mut parts = request.split_whitespace();
-    if let (Some("GET"), Some(path)) = (parts.next(), parts.next()) {
+    if let (Some(command), Some(path)) = (parts.next(), parts.next()) {
         return Some(path);
     }
     None

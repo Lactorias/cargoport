@@ -23,8 +23,24 @@ fn handle_client(mut stream: TcpStream) {
         match request.as_ref() {
             req if req.starts_with("GET") => {
                 println!("Get request recieved!");
-                client::get_handler_client(req, &stream);
+                let mut data: Vec<u8> = Vec::new();
+                if let Some(filename) = ftprequests::extract_filename(req) {
+                    ftprequests::get_handler(filename, &mut stream, &mut data);
+                    client::get_handler_client(req, &mut stream, &mut data);
+                }
             }
+            req if req.starts_with("DEL") => {
+                println!("Del request recieved");
+                if let Some(filename) = ftprequests::extract_filename(req) {
+                    ftprequests::del_handler(filename, &mut stream);
+                    println!("Successfully deleted the file: {}", filename);
+                } else {
+                    println!("Something went wrong...");
+                }
+            }
+            req if req.starts_with("PUT") => {}
+            req if req.starts_with("LIST") => {}
+            req if req.starts_with("QUIT") => {}
             _ => {
                 println!("Error, not a valid command!");
             }
