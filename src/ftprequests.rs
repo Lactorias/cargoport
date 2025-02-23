@@ -2,6 +2,8 @@ use std::fs;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 
 pub fn get_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
     let ftp_root = std::env::var("FTP_ROOT")
@@ -38,7 +40,7 @@ pub fn del_handler(filename: &str, mut stream: &TcpStream) {
 
     match fs::remove_file(full_path) {
         Ok(()) => {
-            let success_msg = "Succesfully deleted file!";
+            let success_msg = "Succesfully deleted file!\n";
             stream
                 .write_all(success_msg.as_bytes())
                 .expect("Failed to alert of deletion.");
@@ -52,9 +54,42 @@ pub fn del_handler(filename: &str, mut stream: &TcpStream) {
     }
 }
 
+pub fn list_handler(stream: &mut TcpStream) {
+    let ftp_root = "/home/fishe/active/dirs/cargoport-test/";
+    let path = Path::new(ftp_root);
+
+    match fs::read_dir(path) {
+        Ok(elements) => {
+            for element in elements {
+                match element {
+                    Ok(element) => {
+                        let filename = element.file_name();
+                        let filename_to_print = format!("{}\n", filename.to_string_lossy());
+                        stream
+                            .write_all(filename_to_print.as_bytes())
+                            .expect("Could not send filename.");
+                    }
+                    Err(_) => {
+                        let error_msg = "No such file present.";
+                        stream
+                            .write_all(error_msg.as_bytes())
+                            .expect("Could not alert of no file.");
+                    }
+                }
+            }
+        }
+        Err(_) => {
+            let error_msg = "Failed to read from directory.";
+            stream
+                .write_all(error_msg.as_bytes())
+                .expect("Failed to alert of unsuccesful read of directory.");
+        }
+    }
+}
+
 pub fn extract_filename(request: &str) -> Option<&str> {
     let mut parts = request.split_whitespace();
-    if let (Some(command), Some(path)) = (parts.next(), parts.next()) {
+    if let (Some(_), Some(path)) = (parts.next(), parts.next()) {
         return Some(path);
     }
     None

@@ -1,11 +1,12 @@
 mod client;
 mod ftprequests;
 
+use std::io::{self, BufRead};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread::spawn;
 
-fn handle_client(mut stream: TcpStream) {
+fn handle_client(mut stream: TcpStream, dir: String) {
     let mut buffer = [0; 1024];
 
     loop {
@@ -26,7 +27,7 @@ fn handle_client(mut stream: TcpStream) {
                 let mut data: Vec<u8> = Vec::new();
                 if let Some(filename) = ftprequests::extract_filename(req) {
                     ftprequests::get_handler(filename, &mut stream, &mut data);
-                    client::get_handler_client(req, &mut stream, &mut data);
+                    client::get_handler_client(req, &mut stream, &mut data, &dir);
                 }
             }
             req if req.starts_with("DEL") => {
@@ -38,8 +39,14 @@ fn handle_client(mut stream: TcpStream) {
                     println!("Something went wrong...");
                 }
             }
-            req if req.starts_with("PUT") => {}
-            req if req.starts_with("LIST") => {}
+            req if req.starts_with("PUT") => {
+                println!("Put request recieved");
+            }
+            req if req.starts_with("LIST") => {
+                println!("List request recieved");
+                ftprequests::list_handler(&mut stream);
+                println!("Successfully provided file list to user.");
+            }
             req if req.starts_with("QUIT") => {}
             _ => {
                 println!("Error, not a valid command!");
@@ -54,8 +61,29 @@ fn main() {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => {
-                std::thread::spawn(|| handle_client(stream));
+            Ok(mut stream) => {
+                let welcome_message =
+                    "Hello! Please enter the directory you wish to begin using.\n";
+                stream
+                    .write_all(welcome_message.as_bytes())
+                    .expect("aaaaaaaaaaaaa");
+                let mut buffer = [0; 1024];
+
+                match stream.read(&mut buffer) {
+                    Ok(bytes_read) => match String::from_utf8(buffer[..bytes_read].to_vec()) {
+                        Ok(mut input) => {
+                            input = input.trim().to_string();
+                            println!("Clients directory: {}", input);
+                            std::thread::spawn(|| handle_client(stream, input));
+                        }
+                        Err(e) => {
+                            println!("Failed to convert bytes to string: {}", e);
+                        }
+                    },
+                    Err(e) => {
+                        println!("Failed to read directory from client: {}", e);
+                    }
+                }
             }
             Err(e) => {
                 eprintln!("Failed to establish connection: {}", e);
