@@ -41,6 +41,16 @@ fn handle_client(mut stream: TcpStream, dir: String) {
             }
             req if req.starts_with("PUT") => {
                 println!("Put request recieved");
+                let mut data: Vec<u8> = Vec::new();
+                if let Some(filename) = ftprequests::extract_filename(req) {
+                    client::put_handler_client(filename, &mut stream, &mut data, &dir);
+                    ftprequests::put_handler(filename, &mut stream, &mut data);
+                }
+            }
+            req if req.starts_with("LIST_CLIENT") => {
+                println!("List client request recieved");
+                ftprequests::list_handler_client(&mut stream, &dir);
+                println!("Successfully provided file list to user.");
             }
             req if req.starts_with("LIST") => {
                 println!("List request recieved");

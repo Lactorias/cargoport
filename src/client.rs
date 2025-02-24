@@ -46,3 +46,37 @@ pub fn get_handler_client(
             .expect("Failed to write response\n");
     }
 }
+
+pub fn put_handler_client(
+    filename: &str,
+    mut stream: &TcpStream,
+    data: &mut Vec<u8>,
+    curr_directory: &String,
+) {
+    let full_path = format!("{}/{}", curr_directory, filename);
+
+    let mut file = match File::open(full_path) {
+        Ok(f) => f,
+        Err(_) => {
+            let error_msg = "Error! This file is not present.";
+            stream
+                .write_all(error_msg.as_bytes())
+                .expect("Failed to send error message.");
+            return;
+        }
+    };
+
+    let mut buf = [0; 4096];
+
+    while let Ok(bytes_read) = file.read(&mut buf) {
+        if bytes_read == 0 {
+            break;
+        }
+        data.extend_from_slice(&buf[..bytes_read]);
+    }
+
+    let success = "Succesfully sent a request to place in server!.\n";
+    stream
+        .write_all(success.as_bytes())
+        .expect("Failed to alert client of success");
+}

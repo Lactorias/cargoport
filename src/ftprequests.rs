@@ -1,6 +1,6 @@
 use std::fs;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::net::TcpStream;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -32,6 +32,35 @@ pub fn get_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
 
     println!("File '{}' sent successfully!", filename);
 }
+pub fn put_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
+    let ftp_root = std::env::var("FTP_ROOT")
+        .unwrap_or_else(|_| String::from("/home/fishe/active/dirs/cargoport-test/"));
+
+    let full_path = format!("{}/{}", ftp_root, filename);
+
+    let mut file = File::create(&full_path).expect("Failed to create a new file.");
+    let mut cursor = Cursor::new(data);
+
+    let mut buf = [0; 4096];
+
+    loop {
+        match cursor.read(&mut buf) {
+            Ok(0) => break,
+            Ok(bytes_read) => {
+                file.write_all(&mut buf[..bytes_read])
+                    .expect("Failed to write to file.\n");
+            }
+            Err(_) => {
+                let error_msg = "Failed to read data from client file.";
+                stream
+                    .write_all(error_msg.as_bytes())
+                    .expect("Failed to send error_msg.\n");
+            }
+        }
+    }
+
+    println!("File '{}' sent successfully!", filename);
+}
 
 pub fn del_handler(filename: &str, mut stream: &TcpStream) {
     let ftp_root = std::env::var("FTP_ROOT")
@@ -57,6 +86,38 @@ pub fn del_handler(filename: &str, mut stream: &TcpStream) {
 pub fn list_handler(stream: &mut TcpStream) {
     let ftp_root = "/home/fishe/active/dirs/cargoport-test/";
     let path = Path::new(ftp_root);
+
+    match fs::read_dir(path) {
+        Ok(elements) => {
+            for element in elements {
+                match element {
+                    Ok(element) => {
+                        let filename = element.file_name();
+                        let filename_to_print = format!("{}\n", filename.to_string_lossy());
+                        stream
+                            .write_all(filename_to_print.as_bytes())
+                            .expect("Could not send filename.");
+                    }
+                    Err(_) => {
+                        let error_msg = "No such file present.";
+                        stream
+                            .write_all(error_msg.as_bytes())
+                            .expect("Could not alert of no file.");
+                    }
+                }
+            }
+        }
+        Err(_) => {
+            let error_msg = "Failed to read from directory.";
+            stream
+                .write_all(error_msg.as_bytes())
+                .expect("Failed to alert of unsuccesful read of directory.");
+        }
+    }
+}
+
+pub fn list_handler_client(stream: &mut TcpStream, dir: &String) {
+    let path = Path::new(dir);
 
     match fs::read_dir(path) {
         Ok(elements) => {
