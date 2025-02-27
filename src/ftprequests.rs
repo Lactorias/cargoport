@@ -5,9 +5,7 @@ use std::net::TcpStream;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 
-pub fn get_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
-    let ftp_root = std::env::var("FTP_ROOT")
-        .unwrap_or_else(|_| String::from("/home/fishe/active/dirs/cargoport-test/"));
+pub fn get_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>, ftp_root: &String) {
     let full_path = format!("{}/{}", ftp_root, filename);
 
     let mut file = match File::open(&full_path) {
@@ -32,10 +30,7 @@ pub fn get_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
 
     println!("File '{}' sent successfully!", filename);
 }
-pub fn put_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
-    let ftp_root = std::env::var("FTP_ROOT")
-        .unwrap_or_else(|_| String::from("/home/fishe/active/dirs/cargoport-test/"));
-
+pub fn put_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>, ftp_root: &String) {
     let full_path = format!("{}/{}", ftp_root, filename);
 
     let mut file = File::create(&full_path).expect("Failed to create a new file.");
@@ -62,9 +57,7 @@ pub fn put_handler(filename: &str, mut stream: &TcpStream, data: &mut Vec<u8>) {
     println!("File '{}' sent successfully!", filename);
 }
 
-pub fn del_handler(filename: &str, mut stream: &TcpStream) {
-    let ftp_root = std::env::var("FTP_ROOT")
-        .unwrap_or_else(|_| String::from("/home/fishe/active/dirs/cargoport-test/"));
+pub fn del_handler(filename: &str, mut stream: &TcpStream, ftp_root: &String) {
     let full_path = format!("{}/{}", ftp_root, filename);
 
     match fs::remove_file(full_path) {
@@ -83,8 +76,7 @@ pub fn del_handler(filename: &str, mut stream: &TcpStream) {
     }
 }
 
-pub fn list_handler(stream: &mut TcpStream) {
-    let ftp_root = "/home/fishe/active/dirs/cargoport-test/";
+pub fn list_handler(stream: &mut TcpStream, ftp_root: &String) {
     let path = Path::new(ftp_root);
 
     match fs::read_dir(path) {
